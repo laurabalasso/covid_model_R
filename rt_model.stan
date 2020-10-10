@@ -1,5 +1,7 @@
 functions {
   
+  // safe Negative Binomial random number generator to avoid overflow problems 
+  
   int neg_binomial_2_safe_rng(real eta, real phi) {
     real gamma_rate = gamma_rng(phi, phi / eta);
     if (gamma_rate >= exp(20.79))
@@ -7,6 +9,9 @@ functions {
       
     return poisson_rng(gamma_rate);
   }
+  
+  
+  // generation of infections vector from r_t and the generation time distribution 
   
   vector get_infected(int N, matrix conv_gt, vector r_t, real seed){
     vector[N] y;
@@ -32,16 +37,17 @@ functions {
     return s;
   }
   
-  vector convolve(int N, int M, vector x, vector y ){
+  // convolution of infection vector with symptom onset - test delay distribution
+  vector convolve(int N, int N_delay, vector infections , vector delay ){
     
     vector[N] out;
-    vector[M] rev = reverse(M, y);
-    for(i in 1:M)  {
-      out[i] = dot_product(x[1:i], rev[(M-i+1) : M]);
+    vector[N_delay] rev = reverse(N_delay, delay);
+    for(i in 1:N_delay)  {
+      out[i] = dot_product(infections[1:i], rev[(N_delay-i+1) : N_delay]);
     }
 
-    for(i in 1:(N-M)){
-       out[i+M] = dot_product(x[i:(i+M-1)], rev);
+    for(i in 1:(N-N_delay)){
+       out[i+N_delay] = dot_product(infections[i:(i+N_delay-1)], rev);
      }
     
     return out;
@@ -49,6 +55,15 @@ functions {
   }
   
   
+  vector corrected_positives(int N, int length_delay, vector delay, matrix conv_gt, vector r_t, real seed, vector exposures, int N_nonzero, int[] nonzero_days){
+    vector[N] infected = get_infected(N, conv_gt, r_t, seed);
+    vector[N_nonzero] nz_infected;
+    infected = convolve(N, length_delay, infected, delay);
+    
+    nz_infected = (infected .* exposures)[nonzero_days];
+    return nz_infected;
+  }
+
 
 }
 
@@ -59,7 +74,7 @@ data {
   vector[length_delay] p_delay; // delay distribution 
   vector[N] exposures; 
   
-  int<lower=0> N_nonzero; // number of nonzero observation
+  int<lower=0> N_nonzero; // number of nonzero total observation
   int<lower=0> nonzero_positives[N_nonzero]; // nonzero vector of positives 
   int<lower=0> nonzero_days[N_nonzero]; // nonzero days index 
   }
@@ -67,14 +82,12 @@ data {
 parameters {
   vector[N] log_r_t;
   real<lower=0> alpha;
-  real<lower=0> seed;
+  real<lower=0> seed; // initial value for infections vector
 }
 
 transformed parameters{
   vector<lower = 0>[N] r_t = exp(log_r_t);
-  vector[N] infected = get_infected(N, conv_gt, r_t, seed);
-  vector[N] infected_delay = convolve(N, length_delay, infected, p_delay);
-  vector[N_nonzero] mu = (infected_delay .* exposures)[nonzero_days];
+  vector[N_nonzero] mu = corrected_positives(N, length_delay, p_delay, conv_gt, r_t, seed, exposures, N_nonzero, nonzero_days);
 
 }
 
@@ -82,7 +95,7 @@ model {
   
   alpha ~ gamma(6,1);
   seed ~ exponential(1/0.02);
-  log_r_t[1] ~ normal(0, 0.01) ; 
+  log_r_t[1] ~ normal(0, 100) ; 
   
   for(n in 2:N){
     log_r_t[n] ~ normal(log_r_t[n-1], 0.035);
