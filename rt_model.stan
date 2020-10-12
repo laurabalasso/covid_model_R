@@ -54,14 +54,17 @@ functions {
     
   }
   
-  
+  // apply the above functions and correct the number of positives with exposures 
   vector corrected_positives(int N, int length_delay, vector delay, matrix conv_gt, vector r_t, real seed, vector exposures, int N_nonzero, int[] nonzero_days){
+   
+    vector[N_nonzero] nz_positives;
+    
     vector[N] infected = get_infected(N, conv_gt, r_t, seed);
-    vector[N_nonzero] nz_infected;
     infected = convolve(N, length_delay, infected, delay);
     
-    nz_infected = (infected .* exposures)[nonzero_days];
-    return nz_infected;
+    nz_positives = (infected .* exposures)[nonzero_days];
+    
+    return nz_positives;
   }
 
 
