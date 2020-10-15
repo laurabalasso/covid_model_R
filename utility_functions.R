@@ -22,8 +22,8 @@ get_generation_time_distribution <- function(){
 }
 
 
-get_model_data <- function(data, region, date, buffer_days = 10){
-  df <- data[data$region == region & data$date <= as.Date(date), ]
+get_model_data <- function(data, region, date, start_date =  data$date[1] ,buffer_days = 10){
+  df <- data[data$region == region & data$date <= as.Date(date) & data$date >= as.Date(start_date) , ]
   df <- df[-1]
   
   first_idx <- which(df$positive != 0)[1]
