@@ -84,19 +84,19 @@ data {
 
 parameters {
   vector[N] log_r_t;
-  real<lower=0> alpha;
+  real<lower=0> phi;
   real<lower=0> seed; // initial value for infections vector
 }
 
 transformed parameters{
   vector<lower = 0>[N] r_t = exp(log_r_t);
-  vector[N_nonzero] mu = corrected_positives(N, length_delay, p_delay, conv_gt, r_t, seed, exposures, N_nonzero, nonzero_days);
+  vector[N_nonzero] eta = corrected_positives(N, length_delay, p_delay, conv_gt, r_t, seed, exposures, N_nonzero, nonzero_days);
 
 }
 
 model {
   
-  alpha ~ gamma(6,1);
+  phi ~ gamma(6,1);
   seed ~ exponential(1/0.02);
   log_r_t[1] ~ normal(0, 100) ; 
   
@@ -104,7 +104,7 @@ model {
     log_r_t[n] ~ normal(log_r_t[n-1], 0.035);
   }
   
-  nonzero_positives ~ neg_binomial_2(mu, alpha);
+  nonzero_positives ~ neg_binomial_2(eta, phi);
   
 }
 
@@ -115,7 +115,7 @@ generated quantities{
   real y_rep[N_nonzero];
   
   for(n in 1:N_nonzero){
-    y_rep[n] = neg_binomial_2_safe_rng(mu[n], alpha);
+    y_rep[n] = neg_binomial_2_safe_rng(eta[n], phi);
   }
   
   
