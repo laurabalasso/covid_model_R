@@ -120,7 +120,7 @@ model {
   inv_phi ~ normal(0,1);
   seed ~ exponential(1/0.02);
   tau ~ cauchy(0, 2.5);
-  mu[1] ~ normal(0, 100);
+  mu[1] ~ normal(0, 10);
   for(n in 2:N){
     mu[n] ~ normal(mu[n-1], 0.035);
   }
