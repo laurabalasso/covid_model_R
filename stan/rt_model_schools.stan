@@ -11,7 +11,6 @@ functions {
   }
   
   
-  
   // generation of infections vector from r_t and the generation time distribution 
   
   vector get_infected(int N, matrix conv_gt, vector r_t, real seed){
@@ -56,95 +55,72 @@ functions {
   }
   
   // apply the above functions and correct the number of positives with exposures 
-  matrix corrected_positives(int J, int N, int N_nonzero, int[] nonzero_days, int length_delay, vector delay, matrix conv_gt, matrix r_t, real seed, matrix exposures){
+  vector corrected_positives(int N, int length_delay, vector delay, matrix conv_gt, vector r_t, real seed, vector exposures, int N_nonzero, int[] nonzero_days){
    
-    matrix[N_nonzero, J] corrected_positives;
-    vector[N] infected ;
-    for(j in 1:J){
-      infected = get_infected(N, conv_gt, r_t[, j], seed);
-      infected = convolve(N, length_delay, infected, delay);
-      infected = infected .* exposures[, j];
-      corrected_positives[, j] = infected[nonzero_days];
-      
-    }
-  
-    return corrected_positives;
+    vector[N_nonzero] nz_positives;
+    
+    vector[N] infected = get_infected(N, conv_gt, r_t, seed);
+    infected = convolve(N, length_delay, infected, delay);
+    
+    nz_positives = (infected .* exposures)[nonzero_days];
+    
+    return nz_positives;
   }
 
 
 }
 
-
 data {
-  int<lower=0> J; // number of groups (regions)
   int<lower=0> N; // total number of observations
-  int<lower=0> N_nonzero; // number of observations where total is not 0 
-  int<lower=0> nonzero_days[N_nonzero]; // nonzero days index
-
   matrix[N-1, N] conv_gt; // generation time distribution matrix
   int<lower = 0> length_delay;
   vector[length_delay] p_delay; // delay distribution 
-
-  matrix[N, J] exposures; 
+  vector[N] exposures; 
   
-  int<lower=0> nonzero_positives[N_nonzero, J]; 
+  int<lower=0> N_nonzero; // number of nonzero total observation
+  int<lower=0> nonzero_positives[N_nonzero]; // nonzero vector of positives 
+  int<lower=0> nonzero_days[N_nonzero]; // nonzero days index 
   
-}
-
+  vector<lower=0, upper=1>[N_nonzero] school; //dummy for lockdown open (yes = 1)
+  }
 
 parameters {
-  matrix[N, J] log_rt_raw;
-  vector[N] mu; // log_rt mean in of groups
-  real<lower=0> tau; // between groups variance
-  real<lower=0> inv_phi;
+  vector[N] log_r_t;
+  real<lower=0> phi;
   real<lower=0> seed; // initial value for infections vector
-  
+  real beta_school;
 }
 
 transformed parameters{
-  real phi = inv(inv_phi);
-  matrix[N, J] log_r_t ;
-  matrix<lower = 0>[N, J] r_t ; 
-  matrix[N_nonzero, J] eta; // negative binomial location parameters
-  
-  for(n in 1:N){
-    log_r_t[n, ]  = mu[n] + tau * log_rt_raw[n,] ;
-  }
-  r_t = exp(log_r_t);
-  eta = corrected_positives(J,N,N_nonzero, nonzero_days, length_delay, p_delay, conv_gt, r_t, seed, exposures);
-}
+  vector<lower = 0>[N] r_t = exp(log_r_t);
+  vector[N_nonzero] eta = corrected_positives(N, length_delay, p_delay, conv_gt, r_t, seed, exposures, N_nonzero, nonzero_days);
 
+}
 
 model {
   
-  inv_phi ~ normal(0,1);
+  beta_school ~ normal(0, 50);
+  phi ~ gamma(6,1);
   seed ~ exponential(1/0.02);
-  tau ~ cauchy(0, 2.5);
-  mu[1] ~ normal(0, 10);
+  log_r_t[1] ~ normal(0, 10); 
+  
   for(n in 2:N){
-    mu[n] ~ normal(mu[n-1], 0.035);
+    log_r_t[n] ~ normal(log_r_t[n-1], 0.035);
   }
   
-  for(n in 1:N){
-    log_rt_raw[n, ] ~ normal(0, 1);
-  }
+  nonzero_positives ~ neg_binomial_2( eta + beta_school * school, phi);
   
-  for(j in 1:J){
-    nonzero_positives[ ,j ] ~ neg_binomial_2(eta[,j], phi);
-  }
-
-
 }
 
 
-generated quantities {
-  
+generated quantities{
  
-  real y_rep[N_nonzero, J];
+ 
+  real y_rep[N_nonzero];
   
   for(n in 1:N_nonzero){
-    for(j in 1:J){
-      y_rep[n, j] = neg_binomial_2_safe_rng(eta[n, j], phi);
-    }
+    y_rep[n] = neg_binomial_2_safe_rng(eta[n] + beta_school * school[n] , phi);
   }
+  
+  
 }

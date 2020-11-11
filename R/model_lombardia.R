@@ -7,7 +7,7 @@ source('utility_functions.R')
 ### Model for Lombardia
 
 
-data_lombardia <- get_model_data(data_it, 'Lombardia', initial_date = as.Date('2020-06-30'))
+data_lombardia <- get_model_data(data_it, 'Lombardia', initial_date = as.Date('2020-07-30'))
 
 p_delay <- get_delay_distribution()
 
@@ -69,20 +69,23 @@ ppc_dens_overlay(y = data_lombardia$positive[nonzero_days_l], y_rep[1:1000, ])
 
 ppc_intervals(
   y = data_lombardia$positive[nonzero_days_l],
-  yrep = y_rep,
-  x = data_lombardia$date[nonzero_days_l]
+  yrep = y_rep
 )
+
+
+ppc_stat(y = stan_data_l$nonzero_positives, yrep = y_rep, stat = 'mean')
 
 
 ### R_t curve
 
 fit_summary_lomb <- summary(fit_model_lomb)
 
-medians_rt <- fit_summary_lomb$summary[, '50%'][140: (140+136)]
-min_rt_50_interval <- fit_summary_lomb$summary[, '25%'][140: (140+136)]
-max_rt_50_interval <- fit_summary_lomb$summary[, '75%'][140: (140+136)]
-min_rt_95_interval <- fit_summary_lomb$summary[, '2.5%'][140: (140+136)]
-max_rt_95_interval <- fit_summary_lomb$summary[, '97.5%'][140: (140+136)]
+rt_idx <- which(rownames(fit_summary_lomb$summary) == 'r_t[1]')
+medians_rt <- fit_summary_lomb$summary[rt_idx: (rt_idx + stan_data_l$N - 1), '50%']
+min_rt_50_interval <- fit_summary_lomb$summary[rt_idx: (rt_idx + stan_data_l$N - 1), '25%']
+max_rt_50_interval <- fit_summary_lomb$summary[rt_idx: (rt_idx + stan_data_l$N - 1), '75%']
+min_rt_95_interval <- fit_summary_lomb$summary[rt_idx: (rt_idx + stan_data_l$N - 1), '2.5%']
+max_rt_95_interval <- fit_summary_lomb$summary[rt_idx: (rt_idx + stan_data_l$N - 1), '97.5%']
 
 
 ggplot(data = NULL, aes(x = data_lombardia$date, y = medians_rt)) + 

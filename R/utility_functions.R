@@ -3,7 +3,7 @@ library(ramify)
 ## delay distribution 
 
 get_delay_distribution <- function(){
-  p_delay <- read.csv('./data/p_delay.csv')
+  p_delay <- read.csv('data/p_delay.csv')
   p_delay <- p_delay$p_delay
 }
 

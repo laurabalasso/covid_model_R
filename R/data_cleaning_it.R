@@ -33,6 +33,9 @@ colnames(data_it)[colnames(data_it) == 'nuovi_positivi'] <- 'positive'
 colnames(data_it)[colnames(data_it) == 'tamponi'] <- 'total'
 
 
+negatives <- data.frame(region = data_it$region[which(data_it$positive<0)], date =data_it$date[which(data_it$positive<0)])
+
+
 #############################
 ### total = casi testati  ###
 #############################

@@ -29,8 +29,6 @@ compiled_model <- stan_model('rt_model.stan')
 fit_model <- sampling(compiled_model, data=stan_data, iter = 2000)
 
 
-
-print(fit_model, pars = 'y_rep')
 print(fit_model, pars = 'r_t')
 print(fit_model, pars = 'mu')
 
@@ -70,7 +68,6 @@ ppc_dens_overlay(y = X$positive[nonzero_days], y_rep[1:1000, ])
 ## r_t curve
 
 fit_summary <- summary(fit_model)
-
 
 medians_rt <- fit_summary$summary[, '50%'][129: (129+125)]
 min_rt_50_interval <- fit_summary$summary[, '25%'][129: (129+125)]

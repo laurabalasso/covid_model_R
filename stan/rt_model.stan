@@ -84,11 +84,12 @@ data {
 
 parameters {
   vector[N] log_r_t;
-  real<lower=0> phi;
+  real<lower=0> inv_phi;
   real<lower=0> seed; // initial value for infections vector
 }
 
 transformed parameters{
+  real phi = inv(inv_phi);
   vector<lower = 0>[N] r_t = exp(log_r_t);
   vector[N_nonzero] eta = corrected_positives(N, length_delay, p_delay, conv_gt, r_t, seed, exposures, N_nonzero, nonzero_days);
 
@@ -96,9 +97,9 @@ transformed parameters{
 
 model {
   
-  phi ~ gamma(6,1);
+  inv_phi ~ normal(0,1);
   seed ~ exponential(1/0.02);
-  log_r_t[1] ~ normal(0, 100) ; 
+  log_r_t[1] ~ normal(0, 10) ; 
   
   for(n in 2:N){
     log_r_t[n] ~ normal(log_r_t[n-1], 0.035);
