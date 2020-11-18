@@ -3,14 +3,14 @@ library(ramify)
 ## delay distribution 
 
 get_delay_distribution <- function(){
-  p_delay <- read.csv('data/p_delay.csv')
+  p_delay <- read.csv('../data/p_delay.csv')
   p_delay <- p_delay$p_delay
 }
 
 ## generation time distribution 
 # Source: https://www.ijidonline.com/article/S1201-9712(20)30119-3/pdf 
 
-get_generation_time_distribution <- function(){
+get_generation_time_distribution_ln1 <- function(){
   mean_si = 4.7
   std_si = 2.9
   mu_si = log(mean_si ** 2 / sqrt(std_si ** 2 + mean_si ** 2))
@@ -23,6 +23,34 @@ get_generation_time_distribution <- function(){
   
   return(y)
 }
+
+
+get_generation_time_distribution_ln2 <- function(){
+  mean_si = 4.9
+  std_si = 4.4
+  mu_si = log(mean_si ** 2 / sqrt(std_si ** 2 + mean_si ** 2))
+  sigma_si = sqrt(log(std_si ** 2 / mean_si ** 2 + 1))
+  
+  x <- 0:19
+  y <- plnorm(x, mu_si, sigma_si)
+  y <- c(0, diff(y))
+  y <- y/sum(y)
+  
+  return(y)
+}
+
+get_generation_time_distribution_g <- function(){
+  shape <-  1.87
+  rate <- 0.28
+  
+  x <- 0:19
+  y <- pgamma(x, shape = shape, rate = rate)
+  y <- c(0, diff(y))
+  y <- y/sum(y)
+  
+  return(y)
+}
+
 
 
 ##################################################
@@ -57,8 +85,8 @@ get_model_data <- function(data, region,initial_date =  data$date[1], final_date
 
 ### compute an auxiliary convolution matrix from generation time distribution (for fitting speedup)
 
-get_gt_convolution <- function(N_days){
-  gt <- get_generation_time_distribution()
+get_gt_convolution_ln1 <- function(N_days){
+  gt <- get_generation_time_distribution_ln1()
   convolution_ready_gt = matrix(rep(0, N_days*(N_days-1)), N_days - 1, N_days )
   
   for(t in 1:(N_days-1)){
@@ -70,6 +98,32 @@ get_gt_convolution <- function(N_days){
   return(convolution_ready_gt)
 }
 
+
+get_gt_convolution_ln2 <- function(N_days){
+  gt <- get_generation_time_distribution_ln2()
+  convolution_ready_gt = matrix(rep(0, N_days*(N_days-1)), N_days - 1, N_days )
+  
+  for(t in 1:(N_days-1)){
+    begin <- max(1, t - length(gt) + 2)
+    slice_update <- rev(gt[2 : (t - begin + 2)]) 
+    convolution_ready_gt[t , begin : (begin + length(slice_update) - 1)] <- slice_update 
+  }
+  
+  return(convolution_ready_gt)
+}
+
+get_gt_convolution_g <- function(N_days){
+  gt <- get_generation_time_distribution_g()
+  convolution_ready_gt = matrix(rep(0, N_days*(N_days-1)), N_days - 1, N_days )
+  
+  for(t in 1:(N_days-1)){
+    begin <- max(1, t - length(gt) + 2)
+    slice_update <- rev(gt[2 : (t - begin + 2)]) 
+    convolution_ready_gt[t , begin : (begin + length(slice_update) - 1)] <- slice_update 
+  }
+  
+  return(convolution_ready_gt)
+}
 
 
 ### compute exposures from totals
@@ -134,6 +188,41 @@ get_hier_exposures <- function(total){
 }
 
 
+## Dummies for red/orange/yellow area 
+## generates a matrix for each level of risk (yellow = medium , orange = medium-high , red = high)
+
+step1_start <- as.Date('2020-11-06')
+
+red_step1 <- c('Calabria', 'Lombardia', 'Piemonte', 'Valle d\'Aosta')
+orange_step1 <-c('Puglia', 'Sicilia')
+yellow_step1 <- c('Abruzzo', 'Basilicata', 'Campania', 'Emilia-Romagna', "Friuli Venezia Giulia",
+                  'Lazio', 'Liguria','Marche', 'Molise', 'P.A. Bolzano', 'P.A. Trento', 'Sardegna',
+                  'Toscana', 'Umbria', 'Veneto')
+
+
+get_area_dummies <- function(hier_data, regions, initial_date =min(hier_data$date) , final_date = Sys.Date() - 2, buffer_days=10){
+  Y<-O<-R <- data.frame(date=unique(hier_data$date[hier_data$date >= initial_date & hier_data$date <= final_date]))
+  for(i in 1:length(regions)){
+    r <- regions[i]
+    Y[r] <- O[r] <- R[r] <- rep(0, length(R$date))
+    if(r %in% red_step1){
+      R[which(R$date >= step1_start), i+1] <- c((1:5)^2 / 100,rep(1, length(which(R$date >= step1_start))-5))
+    }
+    else if(r %in% orange_step1){
+      O[which(O$date >= step1_start), i+1] <- c((1:5)^2 / 100,rep(1, length(which(O$date >= step1_start))-5))
+    }
+    else if(r %in% yellow_step1){
+      Y[which(Y$date >= step1_start), i+1] <- c((1:5)^2 / 100,rep(1, length(which(Y$date >= step1_start))-5))
+    }
+  }
+  
+  return(list(Y=Y[, -1], O=O[, -1], R = R[, -1]))
+  
+  
+}
+
+
+
 ###  Generate necessary data for hierarchical model fitting ##
 
 ## Arguments: 
@@ -159,9 +248,13 @@ get_hier_data <- function(hier_data, regions, initial_date =  min(hier_data$date
   dates <- seq(initial_date - buffer_days, final_date, by = 'day')
   nonzero_days <- which(apply(total, 1, prod) != 0)
   nonzero_dates <- dates[nonzero_days]
-  
+  dummies <- get_area_dummies(hier_data , regions, initial_date, final_date, buffer_days)
+  yellow_dummies <- dummies$Y
+  orange_dummies <- dummies$O
+  red_dummies <- dummies$R
   l <- list(positives = positives,total = total, exposures = exposures, dates = dates, 
-            nonzero_days = nonzero_days, nonzero_dates = nonzero_dates)
+            nonzero_days = nonzero_days, nonzero_dates = nonzero_dates, yellow_dummies = yellow_dummies,
+            orange_dummies = orange_dummies, red_dummies=red_dummies)
   
   return(l)
   
