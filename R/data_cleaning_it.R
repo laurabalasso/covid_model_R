@@ -8,10 +8,9 @@ library(ramify)
 ###   total = tamponi     ###
 #############################
 
-csv <- tryCatch(url("https://raw.githubusercontent.com/pcm-dpc/COVID-19/master/dati-regioni/dpc-covid19-ita-regioni.csv"),
-         error = function(e) {return('../data/data_regions.csv')})
+## data_it <- read_csv('../data/data_regions.csv')
 
-data_it <- read.csv(csv)
+data_it <- read.csv(url("https://raw.githubusercontent.com/pcm-dpc/COVID-19/master/dati-regioni/dpc-covid19-ita-regioni.csv"))
 
 data_it$data <- as.Date(data_it$data)
 
