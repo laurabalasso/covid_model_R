@@ -120,9 +120,9 @@ model {
   beta_school ~ normal(1, 10);
   inv_phi ~ normal(0,1);
   seed ~ exponential(1/0.02);
-  tau ~ cauchy(0, 1);
+  tau ~ cauchy(0, 2.5);
   
-  alpha ~ normal(1, tau);
+  alpha ~ normal(0, tau);
   
   log_rt[1, ] ~ normal(0, 10);
   for(n in 2:N){
