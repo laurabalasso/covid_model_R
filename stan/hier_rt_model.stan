@@ -93,8 +93,8 @@ data {
 
 
 parameters {
-  matrix[N, J] log_rt_raw;
-  vector[N] mu; // log_rt mean in of groups
+  matrix[N, J] log_rt;
+  real alpha; // log_rt mean in of groups
   real<lower=0> tau; // between groups variance
   real<lower=0> inv_phi;
   real<lower=0> seed; // initial value for infections vector
@@ -103,14 +103,11 @@ parameters {
 
 transformed parameters{
   real phi = inv(inv_phi);
-  matrix[N, J] log_r_t ;
   matrix<lower = 0>[N, J] r_t ; 
   matrix[N_nonzero, J] eta; // negative binomial location parameters
   
-  for(n in 1:N){
-    log_r_t[n, ]  = mu[n] + tau * log_rt_raw[n,] ;
-  }
-  r_t = exp(log_r_t);
+
+  r_t = exp(log_rt);
   eta = corrected_positives(J,N,N_nonzero, nonzero_days, length_delay, p_delay, conv_gt, r_t, seed, exposures);
 }
 
@@ -119,15 +116,15 @@ model {
   
   inv_phi ~ normal(0,1);
   seed ~ exponential(1/0.02);
-  tau ~ cauchy(0, 2.5);
-  mu[1] ~ normal(0, 10);
-  for(n in 2:N){
-    mu[n] ~ normal(mu[n-1], 0.035);
-  }
+  tau ~ cauchy(0, 1);
   
-  for(n in 1:N){
-    log_rt_raw[n, ] ~ normal(0, 1);
+  alpha ~ normal(1, tau);
+  
+  log_rt[1, ] ~ normal(0, 10);
+  for(n in 2:N){
+    log_rt[n, ] ~ normal( alpha + log_rt[n-1, ] , 0.035);
   }
+ 
   
   for(j in 1:J){
     nonzero_positives[ ,j ] ~ neg_binomial_2(eta[,j], phi);
@@ -151,3 +148,4 @@ generated quantities {
     }
   }
 }
+
