@@ -1,13 +1,15 @@
 library(rstan)
 library(bayesplot)
-library(ggplot2)
-source('data_cleaning_it.R')
-source('utility_functions.R')
+source('R/data_cleaning_it.R')
+source('R/hierarchical_model_data.R')
+source('R/rt_plots.R')
 
 ## regions <- unique(data_it$region)
 
-regions <- c('Lazio', 'Lombardia', 'Abruzzo', 'Veneto', 'Molise', 'Basilicata')
-hier_data <- get_hier_data(data_it, regions, final_date = as.Date('2020-05-15'))
+#regions <- c('Lazio', 'Lombardia', 'Abruzzo', 'Veneto', 'Molise', 'Basilicata')
+
+regions <- c('Lombardia', 'Lazio')
+hier_data <- get_hier_data(data_it, regions, initial_date = as.Date('2020-09-15'))
 
 
 ### lockdown effect
@@ -27,7 +29,7 @@ stan_data_hier <- list(J = length(regions),
                        N = nrow(hier_data$exposures),
                        N_nonzero = length(hier_data$nonzero_days),
                        nonzero_days = hier_data$nonzero_days,
-                       conv_gt = get_gt_convolution(nrow(hier_data$exposures)),
+                       conv_gt = get_gt_convolution_ln2(nrow(hier_data$exposures)),
                        length_delay = length(p_delay),
                        p_delay = p_delay,
                        exposures = hier_data$exposures,
@@ -35,9 +37,9 @@ stan_data_hier <- list(J = length(regions),
 )
 
 
-compiled_hier <- stan_model('hier_rt_model.stan')
+compiled_hier <- stan_model('stan/hier_rt_model.stan')
 
-fit_hier <- sampling(compiled_hier, data = stan_data_hier, iter= 2000, cores= getOption("mc.cores", 1L))
+fit_hier <- sampling(compiled_hier, data = stan_data_hier, iter= 100, cores= getOption("mc.cores", 1L))
 
 print(fit_hier, pars = 'y_rep')
 
@@ -134,29 +136,6 @@ ppc_intervals_grouped(y=as.vector(stan_data_hier$nonzero_positives),yrep=y_rep,g
 
 ### R_t curve
 
-fit_summary_hier <- summary(fit_hier)
 
-rt_idx <- which(rownames(fit_summary_hier$summary) == 'r_t[1,1]')
-medians_rt <- fit_summary_lomb$summary[rt_idx: (rt_idx + stan_data_l$N - 1), '50%']
-min_rt_50_interval <- fit_summary_lomb$summary[rt_idx: (rt_idx + stan_data_l$N - 1), '25%']
-max_rt_50_interval <- fit_summary_lomb$summary[rt_idx: (rt_idx + stan_data_l$N - 1), '75%']
-min_rt_95_interval <- fit_summary_lomb$summary[rt_idx: (rt_idx + stan_data_l$N - 1), '2.5%']
-max_rt_95_interval <- fit_summary_lomb$summary[rt_idx: (rt_idx + stan_data_l$N - 1), '97.5%']
-
-
-ggplot(data = NULL, aes(x = data_lombardia$date, y = medians_rt)) + 
-  geom_line() + 
-  xlab('Date') +
-  ylab('') +
-  ggtitle( 'Lombardia r_t')+
-  geom_hline(yintercept=1, linetype="dashed", color = "red") +
-  geom_vline(xintercept = data_lombardia$date[1]) +
-  geom_ribbon(aes(ymin = min_rt_50_interval, ymax = max_rt_50_interval), alpha= 0.5, fill = 'darkred') +
-  geom_ribbon(aes(ymin = min_rt_95_interval, ymax = max_rt_95_interval), alpha= 0.1, fill = 'darkred')
-
-
-
-
-
-
+plot_rt_hier(hier_data, fit_hier, regions, 'Lombardia')
 

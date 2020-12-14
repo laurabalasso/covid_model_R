@@ -1,8 +1,8 @@
 library(rstan)
 library(bayesplot)
-library(ggplot2)
-source('data_cleaning_it.R')
-source('utility_functions.R')
+source('R/data_cleaning_it.R')
+source('R/regional_model_data.R')
+source('R/rt_plots.R')
 
 ### Model for Lombardia with school opening slope
 
@@ -44,7 +44,7 @@ p_delay <- get_delay_distribution()
 nonzero_days_l <- which(data_lombardia$total != 0)
 
 stan_data_school <- list(N = nrow(data_lombardia),
-                    conv_gt = get_gt_convolution(nrow(data_lombardia)),
+                    conv_gt = get_gt_convolution_ln2(nrow(data_lombardia)),
                     length_delay = length(p_delay),
                     p_delay = p_delay,
                     exposures = exposures_from_total(data_lombardia$total),
@@ -114,26 +114,4 @@ ppc_stat(y = stan_data_school$nonzero_positives, yrep = y_rep, stat = 'mean')
 
 ### R_t curve
 
-fit_summary_lomb <- summary(fit_model_lomb_school)
-
-rt_idx <- which(rownames(fit_summary_lomb$summary) == 'r_t[1]')
-medians_rt <- fit_summary_lomb$summary[rt_idx: (rt_idx + stan_data_school$N - 1), '50%']
-min_rt_50_interval <- fit_summary_lomb$summary[rt_idx: (rt_idx + stan_data_school$N - 1), '25%']
-max_rt_50_interval <- fit_summary_lomb$summary[rt_idx: (rt_idx + stan_data_school$N - 1), '75%']
-min_rt_95_interval <- fit_summary_lomb$summary[rt_idx: (rt_idx + stan_data_school$N - 1), '2.5%']
-max_rt_95_interval <- fit_summary_lomb$summary[rt_idx: (rt_idx + stan_data_school$N - 1), '97.5%']
-
-
-ggplot(data = NULL, aes(x = data_lombardia$date, y = medians_rt)) + 
-  geom_line() + 
-  xlab('Date') +
-  ylab('') +
-  ggtitle( 'Lombardia r_t') +
-  geom_hline(yintercept=1, linetype="dashed", color = "red") +
-  geom_vline(xintercept = data_lombardia$date[1]) +
-  geom_ribbon(aes(ymin = min_rt_50_interval, ymax = max_rt_50_interval), alpha= 0.5, fill = 'darkred') +
-  geom_ribbon(aes(ymin = min_rt_95_interval, ymax = max_rt_95_interval), alpha= 0.1, fill = 'darkred')
-
-
-
-
+plot_rt(data_lombardia, fit_model_lomb_school, 'Lombardia')

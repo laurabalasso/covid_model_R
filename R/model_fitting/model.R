@@ -1,8 +1,9 @@
 library(rstan)
 library(bayesplot)
-library(ggplot2)
-source('data_cleaning_us.R')
-source('utility_functions.R')
+source('R/data_cleaning_us.R')
+source('R/regional_model_data.R')
+source('R/rt_plots.R')
+
 
 ### model for Oregon from March to June 
 
@@ -13,7 +14,7 @@ p_delay <- get_delay_distribution()
 nonzero_days <- which(X$total != 0)
 
 stan_data <- list(N = nrow(X),
-                  conv_gt = get_gt_convolution(nrow(X)),
+                  conv_gt = get_gt_convolution_ln2(nrow(X)),
                   length_delay = length(p_delay),
                   p_delay = p_delay,
                   exposures = exposures_from_total(X$total),
@@ -24,7 +25,7 @@ stan_data <- list(N = nrow(X),
 )
 
 
-compiled_model <- stan_model('rt_model.stan')
+compiled_model <- stan_model('stan/rt_model.stan')
 
 fit_model <- sampling(compiled_model, data=stan_data, iter = 2000)
 
@@ -69,20 +70,4 @@ ppc_dens_overlay(y = X$positive[nonzero_days], y_rep[1:1000, ])
 
 fit_summary <- summary(fit_model)
 
-medians_rt <- fit_summary$summary[, '50%'][129: (129+125)]
-min_rt_50_interval <- fit_summary$summary[, '25%'][129: (129+125)]
-max_rt_50_interval <- fit_summary$summary[, '75%'][129: (129+125)]
-min_rt_95_interval <- fit_summary$summary[, '2.5%'][129: (129+125)]
-max_rt_95_interval <- fit_summary$summary[, '97.5%'][129: (129+125)]
-
-
-ggplot(data = NULL, aes(x = X$date, y = medians_rt)) + 
-  geom_line() + 
-  xlab('Date') +
-  ylab('') +
-  ggtitle( 'OR r_t')+
-  geom_hline(yintercept=1, linetype="dashed", color = "red") +
-  geom_vline(xintercept = X$date[1]) +
-  geom_ribbon(aes(ymin = min_rt_50_interval, ymax = max_rt_50_interval), alpha= 0.5, fill = 'darkred') +
-  geom_ribbon(aes(ymin = min_rt_95_interval, ymax = max_rt_95_interval), alpha= 0.1, fill = 'darkred')
-
+plot_rt(X, fit_model, 'Oregon')
