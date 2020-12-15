@@ -124,7 +124,7 @@ model {
   
   alpha ~ normal(0, tau);
   
-  log_rt[1, ] ~ normal(0, 10);
+  log_rt[1, ] ~ normal(0, 5);
   for(n in 2:N){
     log_rt[n, ] ~ normal( alpha + log_rt[n-1, ] + beta_school * school[n] , 0.035);
   }

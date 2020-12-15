@@ -120,7 +120,7 @@ model {
   
   alpha ~ normal(0, tau);
   
-  log_rt[1, ] ~ normal(0, 10);
+  log_rt[1, ] ~ normal(0, 5);
   for(n in 2:N){
     log_rt[n, ] ~ normal( alpha + log_rt[n-1, ] , 0.035);
   }
@@ -136,14 +136,14 @@ model {
 
 generated quantities {
   
-  real log_lik[N_nonzero, J];
+ // real log_lik[N_nonzero, J];
   real y_rep[N_nonzero, J];
   
   for(n in 1:N_nonzero){
     for(j in 1:J){
       real eta_nj = eta[n, j];
       y_rep[n, j] = neg_binomial_2_safe_rng(eta_nj, phi);
-      log_lik[n, j]  = neg_binomial_2_lpmf(nonzero_positives[n,j]|eta_nj, phi);
+     // log_lik[n, j]  = neg_binomial_2_lpmf(nonzero_positives[n,j]|eta_nj, phi);
       
     }
   }

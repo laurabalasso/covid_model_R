@@ -81,34 +81,35 @@ data {
   int<lower=0> nonzero_positives[N_nonzero]; // nonzero vector of positives 
   int<lower=0> nonzero_days[N_nonzero]; // nonzero days index 
   
-  vector<lower=0, upper=1>[N_nonzero] school; //dummy for lockdown open (yes = 1)
+  vector<lower=0, upper=1>[N] school; //dummy for school open (yes = 1)
+  vector<lower=0, upper=1>[N] masks;
   }
 
 parameters {
-  vector[N] log_r_t;
+  vector<lower=0>[N] r_t;
   real<lower=0> phi;
   real<lower=0> seed; // initial value for infections vector
   real beta_school;
+  real beta_masks;
 }
 
 transformed parameters{
-  vector<lower = 0>[N] r_t = exp(log_r_t);
+  
   vector[N_nonzero] eta = corrected_positives(N, length_delay, p_delay, conv_gt, r_t, seed, exposures, N_nonzero, nonzero_days);
-
 }
 
 model {
-  
-  beta_school ~ normal(0, 50);
+  beta_school ~ normal(1, 10);
+  beta_masks ~ normal(-1,10);
   phi ~ gamma(6,1);
   seed ~ exponential(1/0.02);
-  log_r_t[1] ~ normal(0, 10); 
+  target += normal_lpdf(log(r_t[1])|0, 10);
   
   for(n in 2:N){
-    log_r_t[n] ~ normal(log_r_t[n-1], 0.035);
+    target += normal_lpdf(log(r_t[n])|log(r_t[n-1]) + log(beta_school ) *school[n] + log(beta_masks) * masks[n], 0.035);
   }
   
-  nonzero_positives ~ neg_binomial_2( eta + beta_school * school, phi);
+  nonzero_positives ~ neg_binomial_2( eta , phi);
   
 }
 
@@ -119,7 +120,7 @@ generated quantities{
   real y_rep[N_nonzero];
   
   for(n in 1:N_nonzero){
-    y_rep[n] = neg_binomial_2_safe_rng(eta[n] + beta_school * school[n] , phi);
+    y_rep[n] = neg_binomial_2_safe_rng(eta[n] , phi);
   }
   
   

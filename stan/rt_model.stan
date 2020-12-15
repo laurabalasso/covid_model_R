@@ -112,11 +112,13 @@ model {
 
 generated quantities{
  
- 
+  real log_lik[N_nonzero];
   real y_rep[N_nonzero];
   
   for(n in 1:N_nonzero){
     y_rep[n] = neg_binomial_2_safe_rng(eta[n], phi);
+    log_lik[n] = neg_binomial_2_lpmf(nonzero_positives[n]|eta[n], phi);
+    
   }
   
   

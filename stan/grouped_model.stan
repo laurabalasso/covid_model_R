@@ -89,51 +89,38 @@ data {
   
   int<lower=0> nonzero_positives[N_nonzero, J]; 
   
-  vector<lower=0, upper=1>[N] school;
-  
 }
 
 
 parameters {
-  matrix[N, J] log_rt_raw;
-  vector[N] mu; // log_rt mean in of groups
-  real<lower=0> tau; // between groups variance
+  matrix[N, J] log_rt;
   real<lower=0> inv_phi;
   real<lower=0> seed; // initial value for infections vector
-  real beta_school; 
+  
 }
 
 transformed parameters{
-  //real log_beta_school = log(beta_school);
   real phi = inv(inv_phi);
-  matrix[N, J] log_r_t ;
   matrix<lower = 0>[N, J] r_t ; 
   matrix[N_nonzero, J] eta; // negative binomial location parameters
   
-  for(n in 1:N){
-    log_r_t[n, ]  = mu[n]  + tau * log_rt_raw[n,] ;
-  }
-  r_t = exp(log_r_t);
+  r_t = exp(log_rt);
   eta = corrected_positives(J,N,N_nonzero, nonzero_days, length_delay, p_delay, conv_gt, r_t, seed, exposures);
 }
 
 
 model {
-  beta_school ~ normal(1, 10);
+  
   inv_phi ~ normal(0,1);
   seed ~ exponential(1/0.02);
-  tau ~ cauchy(0, 0.5);
-  mu[1] ~ normal(0, 10);
+
+  log_rt[1, ] ~ normal(0,10);
   for(n in 2:N){
-    mu[n] ~ normal(mu[n-1] + beta_school * school[n] , 0.035);
-  }
-  
-  for(n in 1:N){
-    log_rt_raw[n, ] ~ normal(0, 1);
+    log_rt[n, ] ~ normal(log_rt[n-1, ], 0.035);
   }
   
   for(j in 1:J){
-    nonzero_positives[ ,j ] ~ neg_binomial_2(eta[,j] , phi);
+    nonzero_positives[ ,j ] ~ neg_binomial_2(eta[,j], phi);
   }
 
 
@@ -147,9 +134,10 @@ generated quantities {
   
   for(n in 1:N_nonzero){
     for(j in 1:J){
-      real location_n = eta[n, j];
-      y_rep[n, j] = neg_binomial_2_safe_rng( location_n, phi);
-      log_lik[n, j] = neg_binomial_2_lpmf(nonzero_positives[n, j]|location_n, phi);
+      real eta_nj = eta[n, j];
+      y_rep[n, j] = neg_binomial_2_safe_rng(eta_nj, phi);
+      log_lik[n, j]  = neg_binomial_2_lpmf(nonzero_positives[n,j]|eta_nj, phi);
+      
     }
   }
 }
